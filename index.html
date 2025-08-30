@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>📝 단어 형광펜</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg-color: #f8f9fa; --text-color: #212529; --border-color: #dee2e6;
+      --input-bg: #ffffff; --input-border: #ced4da; --header-bg: #ffffff;
+      --preview-bg: #ffffff; --key-color: #495057;
+      --btn-bg: #e9ecef; --btn-hover-bg: #dee2e6;
+      --accent-btn-bg: #339af0; --accent-btn-hover-bg: #1c7ed6;
+    }
+    body.dark {
+      --bg-color: #121212; --text-color: #e9ecef; --border-color: #343a40;
+      --input-bg: #212529; --input-border: #495057; --header-bg: #1c1c1c;
+      --preview-bg: #1c1c1c; --key-color: #adb5bd;
+      --btn-bg: #343a40; --btn-hover-bg: #495057;
+      --accent-btn-bg: #1c7ed6; --accent-btn-hover-bg: #1b6ec2;
+    }
+    body {
+      font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0; padding: 20px;
+      background-color: var(--bg-color); color: var(--text-color);
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .container { display: grid; grid-template-columns: 300px 1fr 1fr; gap: 20px; height: calc(100vh - 120px); }
+    .panel { background-color: var(--header-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; }
+    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .panel-header h3 { margin: 0; }
+    #editor { resize: vertical; } 
+    #editor, #preview { width: 100%; height: 100%; box-sizing: border-box; font-size: 1rem; line-height: 1.7; border: none; background: none; color: inherit; flex-grow: 1; }
+    #editor { outline: none; }
+    #preview { white-space: pre-wrap; overflow-wrap: break-word; overflow-y: auto; }
+    #keyword-list { list-style: none; padding: 0; margin-top: 15px; overflow-y: auto; flex-grow: 1; }
+    .keyword-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-radius: 6px; margin-bottom: 8px; background-color: var(--bg-color); }
+    .keyword-item span { font-weight: 500; word-break: break-all; }
+    .keyword-item input[type="color"] { min-width: 24px; width: 24px; height: 24px; border: none; background: none; cursor: pointer; }
+    .keyword-item button { background: none; border: none; color: #fa5252; font-size: 1.2rem; cursor: pointer; }
+    #add-keyword-form { display: flex; gap: 8px; }
+    #new-keyword { flex-grow: 1; padding: 8px; border: 1px solid var(--input-border); border-radius: 6px; background-color: var(--input-bg); color: inherit; }
+    #add-btn { padding: 8px 12px; border: none; border-radius: 6px; background-color: var(--accent-btn-bg); color: #fff; cursor: pointer; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .main-controls button, .keyword-controls button, .panel-controls button {
+      border: none; padding: 8px 12px; border-radius: 8px; font-size: 0.9rem;
+      font-weight: 600; cursor: pointer; transition: background-color 0.2s, color 0.2s, transform 0.1s;
+    }
+    .panel-controls { display: flex; gap: 8px; }
+    .keyword-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; padding-top: 15px; border-top: 1px solid var(--border-color); }
+    #version-list-container { font-size: 0.9rem; margin-top: 10px; }
+    #version-list { max-height: 100px; overflow-y: auto; border: 1px solid var(--border-color); padding: 5px; border-radius: 6px; }
+    .version-item { display: flex; justify-content: space-between; align-items: center; padding: 4px; cursor: pointer; }
+    .version-item:hover { background-color: var(--btn-bg); }
+    .version-item button { font-size: 1rem; background: none; color: #fa5252; padding: 0 5px; }
+    .color-palette { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .color-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid var(--border-color); }
+    @media (max-width: 900px) {
+      .container { grid-template-columns: 1fr; height: auto; gap: 10px; }
+      body { padding: 10px; }
+      .header { margin-bottom: 10px; }
+      /* ✨ 모바일에서 원본 텍스트 창 기본 높이 증가 */
+      #editor { min-height: 250px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <h1>📝 단어 형광펜</h1>
+    <div class="main-controls">
+      <button id="toggleDarkBtn">🌗</button>
+    </div>
+  </header>
+
+  <div class="container" id="container">
+    <!-- 왼쪽 패널: 단어 관리 -->
+    <div class="panel">
+      <div class="panel-header"><h3>단어 관리</h3></div>
+      <form id="add-keyword-form" onsubmit="addKeyword(); return false;">
+        <input type="text" id="new-keyword" placeholder="단어 입력...">
+        <input type="color" id="new-color" value="#ffd43b">
+        <button id="add-btn" type="submit">+</button>
+      </form>
+      <div class="color-palette" id="color-palette"></div>
+      <ul id="keyword-list"></ul>
+      <div class="keyword-controls">
+        <button onclick="resetKeywordsToSoi()" title="💛 Soi (짧출+Nai) 불러오기">💛 Soi 기본값</button>
+        <button onclick="clearAllKeywords()">✨ 전체 삭제</button>
+        <button onclick="document.getElementById('fileInput').click()">📂 불러오기</button>
+        <button onclick="exportKeywords()">📤 내보내기</button>
+        <input type="file" id="fileInput" accept=".txt" style="display: none;">
+      </div>
+    </div>
+
+    <!-- 중앙 패널: 원본 텍스트 입력 -->
+    <div class="panel">
+       <div class="panel-header">
+         <h3>원본 텍스트</h3>
+         <div class="panel-controls">
+           <button onclick="pasteToEditor(this)">📝 붙여넣기</button>
+           <button onclick="copyEditor(this)">📋 복사</button>
+           <button onclick="saveVersion()">💾 저장</button>
+           <button onclick="clearEditor()">🧹 초기화</button>
+         </div>
+       </div>
+      <textarea id="editor" placeholder="여기에 텍스트를 입력하거나 붙여넣으세요..."></textarea>
+      <div id="version-list-container">
+        <strong>버전 목록:</strong>
+        <div id="version-list"></div>
+      </div>
+    </div>
+
+    <!-- 오른쪽 패널: 하이라이트 미리보기 -->
+    <div class="panel">
+      <div class="panel-header"><h3>미리보기</h3></div>
+      <div id="preview"></div>
+    </div>
+  </div>
+
+  <script>
+    const editor = document.getElementById('editor');
+    const preview = document.getElementById('preview');
+    const newKeywordInput = document.getElementById('new-keyword');
+    const newColorInput = document.getElementById('new-color');
+    const keywordList = document.getElementById('keyword-list');
+    const fileInput = document.getElementById('fileInput');
+    const versionList = document.getElementById('version-list');
+
+    let keywords = [];
+    
+    const defaultKeywords = [
+        { keyword: "<Thoughts>", color: "#a5d8ff" },
+        { keyword: "</Thoughts>", color: "#a5d8ff" },
+        { keyword: "[Char1]", color: "#b2f2bb" },
+        { keyword: "[Char2]", color: "#ffc9c9" },
+        { keyword: "[Place]", color: "#ffec99" },
+        { keyword: "[Scene]", color: "#d0bfff" },
+        { keyword: "[Angle]", color: "#ffc078" },
+    ];
+
+    function renderKeywords() {
+      keywordList.innerHTML = '';
+      keywords.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'keyword-item';
+        li.innerHTML = `
+          <span>${escapeHtml(item.keyword)}</span>
+          <div>
+            <input type="color" value="${item.color}" onchange="updateColor(${index}, this.value)">
+            <button onclick="deleteKeyword(${index})">&times;</button>
+          </div>
+        `;
+        keywordList.appendChild(li);
+      });
+      updatePreview();
+      saveKeywords();
+    }
+    
+    function addKeyword() {
+      const keyword = newKeywordInput.value.trim();
+      if (keyword && !keywords.some(item => item.keyword === keyword)) {
+        keywords.push({ keyword, color: newColorInput.value });
+        newKeywordInput.value = '';
+        renderKeywords();
+      }
+    }
+
+    function deleteKeyword(index) {
+      keywords.splice(index, 1);
+      renderKeywords();
+    }
+
+    function updateColor(index, color) {
+      keywords[index].color = color;
+      updatePreview();
+      saveKeywords();
+    }
+
+    function escapeHtml(text) {
+        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function updatePreview() {
+        let text = editor.value;
+        if (keywords.length === 0) {
+            preview.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+            return;
+        }
+
+        const allMatches = [];
+        keywords.forEach(item => {
+            const regex = new RegExp(escapeRegExp(item.keyword), 'g');
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+                allMatches.push({
+                    start: match.index,
+                    end: match.index + match[0].length,
+                    color: item.color,
+                    keyword: match[0]
+                });
+            }
+        });
+
+        allMatches.sort((a, b) => a.start - b.start);
+
+        let highlightedHtml = '';
+        let lastIndex = 0;
+        allMatches.forEach(match => {
+            highlightedHtml += escapeHtml(text.substring(lastIndex, match.start));
+            highlightedHtml += `<mark style="background-color:${match.color}; color: #000; padding: 2px 0; border-radius: 3px;">${escapeHtml(match.keyword)}</mark>`;
+            lastIndex = match.end;
+        });
+        highlightedHtml += escapeHtml(text.substring(lastIndex));
+        
+        preview.innerHTML = highlightedHtml.replace(/\n/g, '<br>');
+    }
+
+
+    function saveKeywords() {
+      localStorage.setItem('highlighter_keywords', JSON.stringify(keywords));
+    }
+
+    function loadKeywords() {
+      const saved = localStorage.getItem('highlighter_keywords');
+      if (saved) {
+        keywords = JSON.parse(saved);
+      } else {
+        keywords = [...defaultKeywords];
+      }
+      renderKeywords();
+    }
+
+    // ✨ 'Soi 기본값' 불러오기 기능
+    function resetKeywordsToSoi() {
+        if (confirm('현재 단어 목록을 Soi 기본값으로 초기화하시겠습니까?')) {
+            keywords = [...defaultKeywords];
+            renderKeywords();
+        }
+    }
+    
+    // ✨ 단어 전체 삭제 기능
+    function clearAllKeywords() {
+        if (confirm('정말로 모든 단어를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+            keywords = [];
+            renderKeywords();
+        }
+    }
+
+    function exportKeywords() {
+        const text = keywords.map(k => `${k.keyword},${k.color}`).join('\n');
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'keywords.txt';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const lines = e.target.result.split('\n').filter(line => line.trim() !== '');
+            keywords = lines.map(line => {
+                const parts = line.split(',');
+                return { keyword: (parts[0] || '').trim(), color: (parts[1] || '#ffd43b').trim() };
+            });
+            renderKeywords();
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    });
+    
+    const VERSION_STORAGE_KEY = 'highlighter_versions';
+    function saveVersion() {
+      const content = editor.value.trim();
+      if (!content) { alert('내용이 비어있으면 저장할 수 없습니다.'); return; }
+      let versions = JSON.parse(localStorage.getItem(VERSION_STORAGE_KEY) || '[]');
+      const timestamp = new Date().toLocaleString('ko-KR');
+      versions.unshift({ time: timestamp, text: content });
+      if (versions.length > 20) versions.pop();
+      localStorage.setItem(VERSION_STORAGE_KEY, JSON.stringify(versions));
+      renderVersionList();
+    }
+    
+    function renderVersionList() {
+      let versions = JSON.parse(localStorage.getItem(VERSION_STORAGE_KEY) || '[]');
+      versionList.innerHTML = versions.length === 0 ? '<em>저장된 버전 없음</em>' : '';
+      versions.forEach((v, idx) => {
+        const div = document.createElement('div');
+        div.className = 'version-item';
+        div.innerHTML = `<span>${v.time}</span><button onclick="deleteVersion(${idx})">&times;</button>`;
+        div.onclick = (e) => {
+            if (e.target.tagName === 'BUTTON') return;
+            if (confirm('이 버전을 불러오시겠습니까? 현재 내용은 사라집니다.')) {
+                editor.value = v.text;
+                updatePreview();
+            }
+        };
+        versionList.appendChild(div);
+      });
+    }
+
+    function deleteVersion(idx) {
+        event.stopPropagation();
+        let versions = JSON.parse(localStorage.getItem(VERSION_STORAGE_KEY) || '[]');
+        if (confirm('이 버전을 삭제하시겠습니까?')) {
+            versions.splice(idx, 1);
+            localStorage.setItem(VERSION_STORAGE_KEY, JSON.stringify(versions));
+            renderVersionList();
+        }
+    }
+
+    function clearEditor() {
+      if (confirm('정말로 원본 텍스트를 모두 지우시겠습니까?')) {
+        editor.value = '';
+        updatePreview();
+        localStorage.setItem('highlighter_text', '');
+      }
+    }
+    
+    function showFeedback(btn, message, isSuccess) {
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = isSuccess ? `✅ ${message}` : `❌ ${message}`;
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+        }, 1500);
+    }
+
+    function copyEditor(btn) {
+        if(!editor.value) return;
+        navigator.clipboard.writeText(editor.value).then(() => {
+            showFeedback(btn, '복사 완료', true);
+        }).catch(() => {
+            showFeedback(btn, '복사 실패', false);
+        });
+    }
+    
+    async function pasteToEditor(btn) {
+        try {
+            const text = await navigator.clipboard.readText();
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            editor.value = editor.value.substring(0, start) + text + editor.value.substring(end);
+            editor.selectionStart = editor.selectionEnd = start + text.length;
+            editor.focus();
+            updatePreview();
+            localStorage.setItem('highlighter_text', editor.value);
+            showFeedback(btn, '완료', true);
+        } catch (err) {
+            showFeedback(btn, '실패', false);
+        }
+    }
+
+    document.getElementById('toggleDarkBtn').addEventListener('click', () => {
+      document.body.classList.toggle('dark');
+      localStorage.setItem('highlighter_darkmode', document.body.classList.contains('dark'));
+    });
+    
+    function createColorPalette() {
+        const paletteContainer = document.getElementById('color-palette');
+        const colors = ['#fa5252', '#e64980', '#be4bdb', '#7950f2', '#4c6ef5', '#228be6', '#15aabf', '#12b886', '#40c057', '#82c91e', '#fab005', '#fd7e14'];
+        colors.forEach(color => {
+            const swatch = document.createElement('div');
+            swatch.className = 'color-swatch';
+            swatch.style.backgroundColor = color;
+            swatch.onclick = () => { newColorInput.value = color; };
+            paletteContainer.appendChild(swatch);
+        });
+    }
+
+    window.onload = () => {
+        if (localStorage.getItem('highlighter_darkmode') === 'true') {
+            document.body.classList.add('dark');
+        }
+        loadKeywords();
+        editor.value = localStorage.getItem('highlighter_text') || '';
+        updatePreview();
+        renderVersionList();
+        createColorPalette();
+    };
+    
+    editor.addEventListener('input', () => {
+      updatePreview();
+      localStorage.setItem('highlighter_text', editor.value);
+    });
+  </script>
+</body>
+</html>
+
