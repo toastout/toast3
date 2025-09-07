@@ -42,11 +42,13 @@
     #new-keyword { flex-grow: 1; padding: 8px; border: 1px solid var(--input-border); border-radius: 6px; background-color: var(--input-bg); color: inherit; }
     #add-btn { padding: 8px 12px; border: none; border-radius: 6px; background-color: var(--accent-btn-bg); color: #fff; cursor: pointer; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    /* ✨ 헤더 컨트롤 버튼 정렬 */
+    .main-controls { display: flex; gap: 8px; }
     .main-controls button, .keyword-controls button, .panel-controls button {
       border: none; padding: 8px 12px; border-radius: 8px; font-size: 0.9rem;
       font-weight: 600; cursor: pointer; transition: background-color 0.2s, color 0.2s, transform 0.1s;
     }
-    .panel-controls { display: flex; gap: 8px; }
+    .panel-controls { display: flex; gap: 8px; flex-wrap: wrap; }
     .keyword-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: auto; padding-top: 15px; border-top: 1px solid var(--border-color); }
     #version-list-container { font-size: 0.9rem; margin-top: 10px; }
     #version-list { max-height: 100px; overflow-y: auto; border: 1px solid var(--border-color); padding: 5px; border-radius: 6px; }
@@ -59,7 +61,6 @@
       .container { grid-template-columns: 1fr; height: auto; gap: 10px; }
       body { padding: 10px; }
       .header { margin-bottom: 10px; }
-      /* ✨ 모바일에서 원본 텍스트 창 기본 높이 증가 */
       #editor { min-height: 250px; }
     }
   </style>
@@ -69,12 +70,12 @@
   <header class="header">
     <h1>📝 단어 형광펜</h1>
     <div class="main-controls">
+      <button id="main-link-btn" title="돌아가기">🍞️</button>
       <button id="toggleDarkBtn">🌗</button>
     </div>
   </header>
 
   <div class="container" id="container">
-    <!-- 왼쪽 패널: 단어 관리 -->
     <div class="panel">
       <div class="panel-header"><h3>단어 관리</h3></div>
       <form id="add-keyword-form" onsubmit="addKeyword(); return false;">
@@ -93,15 +94,17 @@
       </div>
     </div>
 
-    <!-- 중앙 패널: 원본 텍스트 입력 -->
     <div class="panel">
        <div class="panel-header">
-         <h3>원본 텍스트</h3>
+         <h3>원본</h3>
          <div class="panel-controls">
            <button onclick="pasteToEditor(this)">📝 붙여넣기</button>
            <button onclick="copyEditor(this)">📋 복사</button>
            <button onclick="saveVersion()">💾 저장</button>
            <button onclick="clearEditor()">🧹 초기화</button>
+           <button id="translate-ko-en-btn" title="한→영 번역">🇬🇧</button>
+           <button id="translate-en-ko-btn" title="영→한 번역">🇰🇷</button>
+           <button id="spell-check-btn" title="맞춤법 검사">🔍</button>
          </div>
        </div>
       <textarea id="editor" placeholder="여기에 텍스트를 입력하거나 붙여넣으세요..."></textarea>
@@ -111,7 +114,6 @@
       </div>
     </div>
 
-    <!-- 오른쪽 패널: 하이라이트 미리보기 -->
     <div class="panel">
       <div class="panel-header"><h3>미리보기</h3></div>
       <div id="preview"></div>
@@ -234,8 +236,7 @@
       }
       renderKeywords();
     }
-
-    // ✨ 'Soi 기본값' 불러오기 기능
+    
     function resetKeywordsToSoi() {
         if (confirm('현재 단어 목록을 Soi 기본값으로 초기화하시겠습니까?')) {
             keywords = [...defaultKeywords];
@@ -243,7 +244,6 @@
         }
     }
     
-    // ✨ 단어 전체 삭제 기능
     function clearAllKeywords() {
         if (confirm('정말로 모든 단어를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
             keywords = [];
@@ -319,7 +319,7 @@
     }
 
     function clearEditor() {
-      if (confirm('정말로 원본 텍스트를 모두 지우시겠습니까?')) {
+      if (confirm('정말로 원본를 모두 지우시겠습니까?')) {
         editor.value = '';
         updatePreview();
         localStorage.setItem('highlighter_text', '');
@@ -359,11 +359,45 @@
         }
     }
 
+    // ✨ 돌아가기 버튼 이벤트 리스너 추가
+    document.getElementById('main-link-btn').addEventListener('click', () => {
+        window.location.href = "https://toastout.github.io/toast/";
+    });
+
     document.getElementById('toggleDarkBtn').addEventListener('click', () => {
       document.body.classList.toggle('dark');
       localStorage.setItem('highlighter_darkmode', document.body.classList.contains('dark'));
     });
     
+    document.getElementById('translate-ko-en-btn').addEventListener('click', () => {
+        const text = editor.value.trim();
+        if (!text) return;
+        window.open(`https://translate.google.com/?sl=ko&tl=en&text=${encodeURIComponent(text)}&op=translate`, '_blank');
+    });
+
+    document.getElementById('translate-en-ko-btn').addEventListener('click', () => {
+        const text = editor.value.trim();
+        if (!text) return;
+        window.open(`https://translate.google.com/?sl=en&tl=ko&text=${encodeURIComponent(text)}&op=translate`, '_blank');
+    });
+
+    document.getElementById('spell-check-btn').addEventListener('click', () => {
+        const text = editor.value.trim();
+        if (!text) return;
+        try {
+            const tempInput = document.createElement('textarea');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            alert('내용이 복사되었습니다. 맞춤법 검사기 사이트에 붙여넣으세요.');
+            window.open('https://nara-speller.co.kr/speller', '_blank');
+        } catch(err) {
+            alert('복사에 실패했습니다.');
+        }
+    });
+
     function createColorPalette() {
         const paletteContainer = document.getElementById('color-palette');
         const colors = ['#fa5252', '#e64980', '#be4bdb', '#7950f2', '#4c6ef5', '#228be6', '#15aabf', '#12b886', '#40c057', '#82c91e', '#fab005', '#fd7e14'];
@@ -394,4 +428,3 @@
   </script>
 </body>
 </html>
-
