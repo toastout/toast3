@@ -29,7 +29,7 @@
     .panel { background-color: var(--header-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; }
     .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     .panel-header h3 { margin: 0; }
-    #editor { resize: vertical; } 
+    #editor { resize: vertical; font-family: inherit; } /* ✨ 글꼴 상속받도록 수정 */
     #editor, #preview { width: 100%; height: 100%; box-sizing: border-box; font-size: 1rem; line-height: 1.7; border: none; background: none; color: inherit; flex-grow: 1; }
     #editor { outline: none; }
     #preview { white-space: pre-wrap; overflow-wrap: break-word; overflow-y: auto; }
@@ -42,7 +42,6 @@
     #new-keyword { flex-grow: 1; padding: 8px; border: 1px solid var(--input-border); border-radius: 6px; background-color: var(--input-bg); color: inherit; }
     #add-btn { padding: 8px 12px; border: none; border-radius: 6px; background-color: var(--accent-btn-bg); color: #fff; cursor: pointer; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    /* ✨ 헤더 컨트롤 버튼 정렬 */
     .main-controls { display: flex; gap: 8px; }
     .main-controls button, .keyword-controls button, .panel-controls button {
       border: none; padding: 8px 12px; border-radius: 8px; font-size: 0.9rem;
@@ -57,6 +56,44 @@
     .version-item button { font-size: 1rem; background: none; color: #fa5252; padding: 0 5px; }
     .color-palette { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
     .color-swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid var(--border-color); }
+    
+    .edit-section {
+        margin-bottom: 10px;
+        padding: 10px;
+        background-color: var(--bg-color);
+        border-radius: 6px;
+    }
+    .edit-section h4 {
+        margin: 0 0 8px 0;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    .edit-form {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    .edit-form input {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid var(--input-border);
+        border-radius: 6px;
+        background-color: var(--input-bg);
+        color: inherit;
+        font-size: 0.9rem;
+    }
+    .edit-form button {
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        color: #fff;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    #delete-range-btn { background-color: #fa5252; }
+    #replace-word-btn { background-color: var(--accent-btn-bg); }
+    .edit-form span { font-weight: bold; }
+
     @media (max-width: 900px) {
       .container { grid-template-columns: 1fr; height: auto; gap: 10px; }
       body { padding: 10px; }
@@ -107,6 +144,27 @@
            <button id="spell-check-btn" title="맞춤법 검사">🔍</button>
          </div>
        </div>
+       
+       <div class="edit-section">
+           <h4>범위 삭제</h4>
+           <div class="edit-form">
+               <input type="text" id="delete-start" placeholder="시작 단어">
+               <span>→</span>
+               <input type="text" id="delete-end" placeholder="끝 단어">
+               <button id="delete-range-btn">삭제</button>
+           </div>
+       </div>
+       
+       <div class="edit-section">
+           <h4>단어 치환</h4>
+           <div class="edit-form">
+               <input type="text" id="replace-find" placeholder="찾을 단어">
+               <span>→</span>
+               <input type="text" id="replace-with" placeholder="바꿀 단어">
+               <button id="replace-word-btn">치환</button>
+           </div>
+       </div>
+
       <textarea id="editor" placeholder="여기에 텍스트를 입력하거나 붙여넣으세요..."></textarea>
       <div id="version-list-container">
         <strong>버전 목록:</strong>
@@ -128,6 +186,8 @@
     const keywordList = document.getElementById('keyword-list');
     const fileInput = document.getElementById('fileInput');
     const versionList = document.getElementById('version-list');
+    const deleteRangeBtn = document.getElementById('delete-range-btn');
+    const replaceWordBtn = document.getElementById('replace-word-btn');
 
     let keywords = [];
     
@@ -214,12 +274,78 @@
         let lastIndex = 0;
         allMatches.forEach(match => {
             highlightedHtml += escapeHtml(text.substring(lastIndex, match.start));
-            highlightedHtml += `<mark style="background-color:${match.color}; color: #000; padding: 2px 0; border-radius: 3px;">${escapeHtml(match.keyword)}</mark>`;
+            // ✨ 형광펜 텍스트 굵게 수정
+            highlightedHtml += `<mark style="background-color:${match.color}; color: #000; padding: 2px 0; border-radius: 3px; font-weight: 600;">${escapeHtml(match.keyword)}</mark>`;
             lastIndex = match.end;
         });
         highlightedHtml += escapeHtml(text.substring(lastIndex));
         
         preview.innerHTML = highlightedHtml.replace(/\n/g, '<br>');
+    }
+    
+    function deleteRange() {
+        const text = editor.value;
+        const startMarker = document.getElementById('delete-start').value;
+        const endMarker = document.getElementById('delete-end').value;
+
+        if (!startMarker || !endMarker) {
+            alert('시작 단어와 끝 단어를 모두 입력해주세요.');
+            return;
+        }
+        
+        const startRegex = new RegExp(escapeRegExp(startMarker), 'i');
+        const startMatch = text.match(startRegex);
+
+        if (!startMatch) {
+            alert(`시작 단어("${startMarker}")를 찾을 수 없습니다.`);
+            return;
+        }
+        
+        const startIndex = startMatch.index;
+        const searchFromIndex = startIndex + startMatch[0].length;
+        const textAfterStart = text.substring(searchFromIndex);
+        
+        const endRegex = new RegExp(escapeRegExp(endMarker), 'i');
+        const endMatch = textAfterStart.match(endRegex);
+
+        if (!endMatch) {
+            alert(`시작 단어 이후에 끝 단어("${endMarker}")를 찾을 수 없습니다.`);
+            return;
+        }
+        
+        const endIndex = endMatch.index + searchFromIndex;
+        const endOfDeletion = endIndex + endMatch[0].length;
+        let newText = text.substring(0, startIndex) + text.substring(endOfDeletion);
+        
+        newText = newText.replace(/(\r\n|\n|\r){2,}/g, '\n');
+        newText = newText.replace(/ {2,}/g, ' '); // ✨ 연속 공백 1개로 수정
+        newText = newText.trim();
+
+        editor.value = newText;
+        updatePreview();
+        localStorage.setItem('highlighter_text', editor.value);
+    }
+    
+    function replaceWords() {
+        const findText = document.getElementById('replace-find').value;
+        const replaceText = document.getElementById('replace-with').value;
+
+        if (!findText) {
+            alert('찾을 단어를 입력해주세요.');
+            return;
+        }
+
+        const findRegex = new RegExp(escapeRegExp(findText), 'gi');
+        const newText = editor.value.replace(findRegex, replaceText);
+
+        if (editor.value === newText) {
+            alert(`"${findText}"를 찾을 수 없어 변경된 내용이 없습니다.`);
+            return;
+        }
+
+        editor.value = newText;
+        updatePreview();
+        localStorage.setItem('highlighter_text', editor.value);
     }
 
 
@@ -359,7 +485,6 @@
         }
     }
 
-    // ✨ 돌아가기 버튼 이벤트 리스너 추가
     document.getElementById('main-link-btn').addEventListener('click', () => {
         window.location.href = "https://toastout.github.io/toast/";
     });
@@ -409,6 +534,9 @@
             paletteContainer.appendChild(swatch);
         });
     }
+    
+    deleteRangeBtn.addEventListener('click', deleteRange);
+    replaceWordBtn.addEventListener('click', replaceWords);
 
     window.onload = () => {
         if (localStorage.getItem('highlighter_darkmode') === 'true') {
@@ -428,3 +556,4 @@
   </script>
 </body>
 </html>
+
